@@ -2,6 +2,21 @@ import type { SpeechModelManifest } from '../../shared/speech-types'
 import { getSpeechModelDownloadMetadata } from './model-download-catalog'
 
 export const SPEECH_MODEL_CATALOG: SpeechModelManifest[] = [
+  ...(process.platform === 'darwin'
+    ? [
+        {
+          id: 'macos-native',
+          label: 'macOS Speech',
+          description:
+            'On-device Apple speech recognition using the system language. Managed by macOS.',
+          type: 'macos-native' as const,
+          provider: 'macos-native' as const,
+          language: 'system',
+          sampleRate: 16000,
+          streaming: false
+        }
+      ]
+    : []),
   {
     id: 'parakeet-tdt-0.6b-v3-int8',
     label: 'Parakeet TDT v3',

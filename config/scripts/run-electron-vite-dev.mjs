@@ -323,6 +323,22 @@ function prepareMacDevElectronApp() {
     setPlistValue(helperPlistPath, key, value)
   }
 
+  setPlistValue(
+    plistPath,
+    'NSSpeechRecognitionUsageDescription',
+    'Orca uses on-device speech recognition for voice dictation.'
+  )
+  execFileSync(
+    process.execPath,
+    [
+      path.join(repoRoot, 'config/scripts/build-speech-macos.mjs'),
+      '--single-arch',
+      '--output',
+      path.join(appPath, 'Contents/MacOS/orca-speech')
+    ],
+    { stdio: 'inherit' }
+  )
+
   // Bundle notification helper with dev signing ID because macOS keys authorization by it; without swiftc use delivery-probe fallback.
   try {
     execFileSync(

@@ -225,6 +225,7 @@ const macUsageDescriptions = {
     'Orca allows terminal-launched developer tools to access your reminders when you request it.',
   NSRemindersFullAccessUsageDescription:
     'Orca allows terminal-launched developer tools to access your reminders when you request it.',
+  NSSpeechRecognitionUsageDescription: 'Orca uses on-device speech recognition for voice dictation.',
   NSAudioCaptureUsageDescription:
     'Orca allows terminal-launched developer tools to capture desktop audio when you request it.',
   NSBonjourServices: ['_http._tcp', '_https._tcp'],
@@ -613,6 +614,10 @@ module.exports = {
     ],
     // macOS 26 UNUserNotificationCenter aborts helpers launched from Resources; execute from Contents/MacOS (#7929).
     extraFiles: [
+      {
+        from: 'native/speech-macos/.build/release/orca-speech',
+        to: 'MacOS/orca-speech'
+      },
       {
         from: 'native/notification-status-macos/.build/release/orca-notification-status',
         to: 'MacOS/orca-notification-status'

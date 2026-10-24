@@ -103,8 +103,9 @@ export class ModelManager extends SpeechModelDownloadTransport {
       return { id: modelId, status: 'error', error: 'Unknown model' }
     }
 
-    if (manifest.provider === 'openai') {
-      return { id: modelId, status: this.hasOpenAiKey() ? 'ready' : 'not-downloaded' }
+    if (manifest.provider === 'openai' || manifest.provider === 'macos-native') {
+      const ready = manifest.provider === 'macos-native' || this.hasOpenAiKey()
+      return { id: modelId, status: ready ? 'ready' : 'not-downloaded' }
     }
 
     const modelDir = this.getModelDir(modelId)
