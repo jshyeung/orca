@@ -41,6 +41,7 @@ export function VoiceSpeechModelSection({
   onRefreshModelStates
 }: VoiceSpeechModelSectionProps): React.JSX.Element {
   const [pendingDeleteModelIds, setPendingDeleteModelIds] = useState<Set<string>>(() => new Set())
+  const [preparingSystemModel, setPreparingSystemModel] = useState(false)
   const getModelState = (id: string): SpeechModelState | undefined =>
     modelStates.find((s) => s.id === id)
 
@@ -82,7 +83,9 @@ export function VoiceSpeechModelSection({
             const mState = getModelState(manifest.id)
             const isReady = mState?.status === 'ready'
             const isDownloading =
-              mState?.status === 'downloading' || mState?.status === 'extracting'
+              mState?.status === 'downloading' ||
+              mState?.status === 'extracting' ||
+              (manifest.provider === 'macos-native' && preparingSystemModel)
             const isActive = voiceSettings.sttModel === manifest.id
             const isCloud = manifest.provider === 'openai'
             const isLocal = manifest.provider === 'local'
@@ -94,7 +97,20 @@ export function VoiceSpeechModelSection({
                 key={manifest.id}
                 disabled={isDownloading}
                 onSelect={(event) => {
-                  if (isReady) {
+                  if (manifest.provider === 'macos-native') {
+                    event.preventDefault()
+                    setPreparingSystemModel(true)
+                    void window.api.speech
+                      .downloadModel(manifest.id)
+                      .then(() => onUpdateVoiceSettings({ sttModel: manifest.id }))
+                      .catch((error: unknown) =>
+                        toast.error(describeSpeechModelDownloadError(error))
+                      )
+                      .finally(() => {
+                        setPreparingSystemModel(false)
+                        onRefreshModelStates()
+                      })
+                  } else if (isReady) {
                     onUpdateVoiceSettings({ sttModel: manifest.id })
                   } else if (isCloud) {
                     onOpenOpenAiDialog(manifest.id)

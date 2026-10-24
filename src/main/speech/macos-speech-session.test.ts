@@ -1,9 +1,13 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import os from 'node:os'
 import { readFile, access } from 'node:fs/promises'
 import { runProcess } from '@orca/process-host'
-import { MacosSpeechSession } from './macos-speech-session'
+import { MacosSpeechSession, prepareMacosSpeech } from './macos-speech-session'
 
 vi.mock('@orca/process-host', () => ({ runProcess: vi.fn() }))
+beforeEach(() => {
+  vi.spyOn(os, 'release').mockReturnValue('25.0.0')
+})
 afterEach(() => {
   vi.restoreAllMocks()
 })
@@ -12,6 +16,35 @@ describe('macOS speech session', () => {
   it('rejects unsupported hosts', () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
     expect(() => new MacosSpeechSession()).toThrow('only available on macOS')
+  })
+
+  it('rejects older macOS before spawning the helper', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    vi.spyOn(os, 'release').mockReturnValue('24.6.0')
+    expect(() => new MacosSpeechSession()).toThrow('macOS 26 or newer')
+  })
+
+  it('shares in-flight OS asset installation and allows retry after failure', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    vi.mocked(runProcess).mockRejectedValueOnce(new Error('Asset installation failed'))
+    const first = prepareMacosSpeech()
+    expect(prepareMacosSpeech()).toBe(first)
+    await expect(first).rejects.toThrow('Asset installation failed')
+    vi.mocked(runProcess).mockResolvedValueOnce({
+      code: 0,
+      signal: null,
+      stdout: '',
+      stderr: '',
+      timedOut: false
+    })
+    await expect(prepareMacosSpeech()).resolves.toBeUndefined()
+  })
+
+  it('accepts more than one minute of audio but bounds buffered recording to ten minutes', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    const session = new MacosSpeechSession()
+    expect(() => session.feedAudio(new Float32Array(16000 * 61), 16000)).not.toThrow()
+    expect(() => session.feedAudio(new Float32Array(16000 * 540), 16000)).toThrow('10 minutes')
   })
 
   it('resamples recorded audio and removes the private WAV after recognition', async () => {

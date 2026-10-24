@@ -225,7 +225,6 @@ const macUsageDescriptions = {
     'Orca allows terminal-launched developer tools to access your reminders when you request it.',
   NSRemindersFullAccessUsageDescription:
     'Orca allows terminal-launched developer tools to access your reminders when you request it.',
-  NSSpeechRecognitionUsageDescription: 'Orca uses on-device speech recognition for voice dictation.',
   NSAudioCaptureUsageDescription:
     'Orca allows terminal-launched developer tools to capture desktop audio when you request it.',
   NSBonjourServices: ['_http._tcp', '_https._tcp'],

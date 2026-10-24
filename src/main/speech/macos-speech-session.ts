@@ -4,22 +4,50 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { encodePcm16Wav } from './openai-transcription-client'
 import { resampleToRate } from './stt-audio-resample'
+import { isMacosTahoeOrNewer } from '../window/macos-tahoe-release'
+
+let preparation: Promise<void> | undefined
+
+export function prepareMacosSpeech(): Promise<void> {
+  preparation ??= runMacosSpeech(['--prepare'], 10 * 60_000)
+    .then(() => undefined)
+    .finally(() => {
+      preparation = undefined
+    })
+  return preparation
+}
+
+async function runMacosSpeech(args: string[], timeoutMs: number): Promise<string> {
+  if (process.platform !== 'darwin' || !isMacosTahoeOrNewer()) {
+    throw new Error('macOS speech recognition is only available on macOS 26 or newer')
+  }
+  const result = await runProcess({
+    program: path.join(path.dirname(process.execPath), 'orca-speech'),
+    args,
+    timeoutMs,
+    maxOutputBytes: 1024 * 1024
+  })
+  if (result.code !== 0 || result.timedOut) {
+    throw new Error(result.stderr.trim() || 'macOS speech recognition failed or timed out')
+  }
+  return result.stdout.trim()
+}
 
 export class MacosSpeechSession {
   private chunks: Float32Array[] = []
   private samples = 0
 
   constructor() {
-    if (process.platform !== 'darwin') {
-      throw new Error('macOS speech recognition is only available on macOS')
+    if (process.platform !== 'darwin' || !isMacosTahoeOrNewer()) {
+      throw new Error('macOS speech recognition is only available on macOS 26 or newer')
     }
   }
 
   feedAudio(samples: Float32Array, sampleRate: number): void {
     const normalized = resampleToRate(samples, sampleRate, 16000)
     this.samples += normalized.length
-    if (this.samples > 16000 * 60) {
-      throw new Error('macOS speech recognition is limited to one minute per dictation')
+    if (this.samples > 16000 * 60 * 10) {
+      throw new Error('macOS speech recognition is limited to 10 minutes per dictation')
     }
     this.chunks.push(new Float32Array(normalized))
   }
@@ -34,16 +62,7 @@ export class MacosSpeechSession {
     try {
       const audioPath = path.join(directory, 'dictation.wav')
       await writeFile(audioPath, encodePcm16Wav(chunks, 16000), { mode: 0o600 })
-      const result = await runProcess({
-        program: path.join(path.dirname(process.execPath), 'orca-speech'),
-        args: [audioPath],
-        timeoutMs: 55_000,
-        maxOutputBytes: 1024 * 1024
-      })
-      if (result.code !== 0 || result.timedOut) {
-        throw new Error(result.stderr.trim() || 'macOS speech recognition failed or timed out')
-      }
-      return result.stdout.trim()
+      return await runMacosSpeech([audioPath], 55_000)
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

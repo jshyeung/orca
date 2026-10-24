@@ -323,11 +323,6 @@ function prepareMacDevElectronApp() {
     setPlistValue(helperPlistPath, key, value)
   }
 
-  setPlistValue(
-    plistPath,
-    'NSSpeechRecognitionUsageDescription',
-    'Orca uses on-device speech recognition for voice dictation.'
-  )
   execFileSync(
     process.execPath,
     [

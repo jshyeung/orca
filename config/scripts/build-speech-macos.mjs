@@ -18,12 +18,19 @@ const architectures = args.includes('--single-arch')
   : ['arm64', 'x86_64']
 const temporary = mkdtempSync(path.join(tmpdir(), 'orca-speech-build-'))
 try {
+  const sdkVersion = execFileSync('xcrun', ['--sdk', 'macosx', '--show-sdk-version'], {
+    encoding: 'utf8'
+  }).trim()
+  if (Number.parseInt(sdkVersion, 10) < 26) {
+    throw new Error('Building macOS Speech requires Xcode 26 or newer (macOS 26 SDK)')
+  }
   const binaries = architectures.map((arch) => {
     const binary = path.join(temporary, arch)
     execFileSync(
       'swiftc',
       [
         '-O',
+        '-parse-as-library',
         '-target',
         `${arch}-apple-macosx11.0`,
         path.join(root, 'native/speech-macos/main.swift'),
