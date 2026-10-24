@@ -27,14 +27,26 @@ function host() {
   roots.push(modelsDir)
   setSpeechServiceFactories(orcadSpeechServiceFactories)
   const updateSettings = vi.fn()
-  const store = {
+  const runtimeStore: RuntimeStore = {
+    getRepos: () => [],
+    getRepo: () => undefined,
+    addRepo: vi.fn<RuntimeStore['addRepo']>(),
+    updateRepo: vi.fn<RuntimeStore['updateRepo']>(),
+    getAllWorktreeMeta: () => ({}),
+    getWorktreeMeta: () => undefined,
+    setWorktreeMeta: vi.fn<RuntimeStore['setWorktreeMeta']>(),
+    removeWorktreeMeta: vi.fn<RuntimeStore['removeWorktreeMeta']>(),
+    getGitHubCache: vi.fn<RuntimeStore['getGitHubCache']>(),
     getSettings: () => ({
+      workspaceDir: modelsDir,
+      nestWorkspaces: false,
+      refreshLocalBaseRefOnWorktreeCreate: false,
+      branchPrefix: 'none',
+      branchPrefixCustom: '',
       voice: { ...getDefaultVoiceSettings(), enabled: true, sttModel: 'macos-native', modelsDir }
     }),
     updateSettings
   }
-  // SAFETY: these speech controllers only read voice settings and write through updateSettings.
-  const runtimeStore = store as unknown as RuntimeStore
   return { runtimeStore, updateSettings }
 }
 

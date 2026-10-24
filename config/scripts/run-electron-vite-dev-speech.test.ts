@@ -15,7 +15,9 @@ function fixture() {
   const builds: string[] = []
   const warnings: string[] = []
   const removed: string[] = []
-  const inputs = { swift: 'speech source', build: 'speech build', failBuild: false }
+  const copies: string[] = []
+  const commands: string[] = []
+  const inputs = { swift: 'speech source', build: 'speech build', failBuild: false, inUse: false }
   const env: Record<string, string> = {}
   const context = {
     process: { platform: 'darwin', execPath: '/node', env },
@@ -27,7 +29,8 @@ function fixture() {
     getDevBundlePlistPatches: () => [],
     getDevHelperPlistPatches: () => [],
     sanitizeMacAppBundleName: (name: string) => name,
-    existsSync: (name: string) => !name.endsWith('marker.json') || files.has(name),
+    existsSync: (name: string) =>
+      (!name.endsWith('marker.json') && !name.endsWith('/orca-speech')) || files.has(name),
     readFileSync: (name: string) => {
       if (name.endsWith('package.json')) {
         return '{"version":"43"}'
@@ -41,20 +44,28 @@ function fixture() {
       return files.get(name)
     },
     writeFileSync: (name: string, data: string) => files.set(name, data),
-    rmSync: (name: string) => removed.push(name),
+    rmSync: (name: string) => {
+      removed.push(name)
+      files.delete(name)
+    },
     mkdirSync() {},
-    copyPrivateTree() {},
+    copyPrivateTree: (_source: string, destination: string) => copies.push(destination),
     restoreElectronFrameworkSymlinks() {},
     setPlistValue() {},
     pruneStaleDevBundles() {},
     getDevBundleProcessTable: () => [],
-    isDevBundleInUse: () => false,
+    isDevBundleInUse: () => inputs.inUse,
     console: { warn: (message: string) => warnings.push(message) },
-    execFileSync: (_program: string, args: string[]) => {
+    execFileSync: (program: string, args: string[]) => {
+      commands.push(program)
       if (args[0]?.endsWith('build-speech-macos.mjs')) {
         builds.push(args[args.indexOf('--output') + 1])
         if (inputs.failBuild) {
           throw new Error('Xcode 26 SDK unavailable')
+        }
+        const output = builds.at(-1)
+        if (output) {
+          files.set(output, 'compiled helper')
         }
       }
       return ''
@@ -65,6 +76,8 @@ function fixture() {
     builds,
     warnings,
     removed,
+    copies,
+    commands,
     env,
     launch: () => vm.runInNewContext(`${prepare}\nprepareMacDevElectronApp()`, context)
   }
@@ -93,5 +106,33 @@ describe('development speech helper', () => {
     expect(dev.env.ELECTRON_EXEC_PATH).toMatch(/\/Contents\/MacOS\/Electron$/)
     expect(dev.removed).toContain(dev.builds[0])
     expect(dev.warnings.some((message) => message.includes('Xcode 26 SDK unavailable'))).toBe(true)
+  })
+
+  it('recovers after installing the toolchain without recopying the cached bundle', () => {
+    const dev = fixture()
+    dev.inputs.failBuild = true
+    dev.launch()
+    dev.launch()
+    expect(dev.builds).toHaveLength(2)
+    dev.inputs.failBuild = false
+    dev.launch()
+    dev.launch()
+    expect(dev.builds).toHaveLength(3)
+    expect(dev.copies).toHaveLength(1)
+    expect(dev.commands.filter((command) => command === '/usr/bin/codesign')).toHaveLength(2)
+  })
+
+  it('defers the retry while another instance uses the bundle', () => {
+    const dev = fixture()
+    dev.inputs.failBuild = true
+    dev.launch()
+    dev.inputs.failBuild = false
+    dev.inputs.inUse = true
+    dev.launch()
+    expect(dev.builds).toHaveLength(1)
+    expect(dev.copies).toHaveLength(1)
+    dev.inputs.inUse = false
+    dev.launch()
+    expect(dev.builds).toHaveLength(2)
   })
 })

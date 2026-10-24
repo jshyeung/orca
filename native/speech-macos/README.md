@@ -11,7 +11,7 @@ if desktop settings select it, mobile dictation asks the user to choose a suppor
 model instead. Parakeet and OpenAI remain available to mobile clients.
 
 The helper recognizes a private temporary WAV through `SpeechAnalyzer` and
-`SpeechTranscriber`, using the system locale and the offline transcription preset.
+`SpeechTranscriber`, using the system locale and the `.transcription` preset.
 Selecting the engine requests installation of missing language assets through
 Apple's `AssetInventory`; macOS owns and updates these assets. Orca does not store
 or delete the models. Installation has a separate ten-minute timeout and must

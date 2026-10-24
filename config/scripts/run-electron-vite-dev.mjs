@@ -284,7 +284,34 @@ function prepareMacDevElectronApp() {
     )
   }
 
+  const speechHelperPath = path.join(appPath, 'Contents', 'MacOS', 'orca-speech')
+  function buildSpeechHelper() {
+    try {
+      const args = [speechBuildScript, '--single-arch', '--output', speechHelperPath]
+      execFileSync(process.execPath, args, { stdio: 'inherit' })
+      return true
+    } catch (error) {
+      rmSync(speechHelperPath, { force: true })
+      console.warn(
+        `[orca-dev] speech helper build failed (macOS native voice unavailable): ${error?.message ?? error}`
+      )
+      return false
+    }
+  }
+
   if (copiedAppIsUsable()) {
+    if (!existsSync(speechHelperPath)) {
+      const processTable = getDevBundleProcessTable()
+      const canRetry = processTable !== null && !isDevBundleInUse(distDir, processTable)
+      if (canRetry && buildSpeechHelper()) {
+        try {
+          execFileSync('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', appPath])
+        } catch (error) {
+          rmSync(markerPath, { force: true })
+          console.warn(`[orca-dev] ad-hoc codesign failed: ${error?.message ?? error}`)
+        }
+      }
+    }
     pruneStaleDevBundles(distDir)
     process.env.ELECTRON_EXEC_PATH = executablePath
     return
@@ -329,19 +356,7 @@ function prepareMacDevElectronApp() {
     setPlistValue(helperPlistPath, key, value)
   }
 
-  const speechHelperPath = path.join(appPath, 'Contents', 'MacOS', 'orca-speech')
-  try {
-    execFileSync(
-      process.execPath,
-      [speechBuildScript, '--single-arch', '--output', speechHelperPath],
-      { stdio: 'inherit' }
-    )
-  } catch (error) {
-    rmSync(speechHelperPath, { force: true })
-    console.warn(
-      `[orca-dev] speech helper build failed (macOS native voice unavailable): ${error?.message ?? error}`
-    )
-  }
+  buildSpeechHelper()
 
   // Bundle notification helper with dev signing ID because macOS keys authorization by it; without swiftc use delivery-probe fallback.
   try {
