@@ -216,9 +216,14 @@ function prepareMacDevElectronApp() {
   const identityKey = process.env.ORCA_DEV_INSTANCE_KEY || repoRoot
   // v11 stabilizes Info.plist/cdhash; ignored stale marker fields permit schema narrowing without another bump.
   const bundleLayoutVersion = 'stable-cdhash-dock-name-from-bundle-dir-v11'
+  const speechBuildScript = path.join(repoRoot, 'config/scripts/build-speech-macos.mjs')
+  const speechFingerprint = createHash('sha256')
+    .update(readFileSync(speechBuildScript))
+    .update(readFileSync(path.join(repoRoot, 'native/speech-macos/main.swift')))
+    .digest('hex')
   const hash = createHash('sha1')
     .update(
-      `${sourceAppPath}\0${electronVersion ?? ''}\0${title}\0${identityKey}\0${bundleLayoutVersion}`
+      `${sourceAppPath}\0${electronVersion ?? ''}\0${title}\0${identityKey}\0${bundleLayoutVersion}\0${speechFingerprint}`
     )
     .digest('hex')
     .slice(0, 12)
@@ -239,6 +244,7 @@ function prepareMacDevElectronApp() {
       sourceAppPath,
       electronVersion,
       bundleLayoutVersion,
+      speechFingerprint,
       plistPatches: [...getDevBundlePlistPatches(), ...getDevHelperPlistPatches()]
     },
     null,
@@ -323,16 +329,19 @@ function prepareMacDevElectronApp() {
     setPlistValue(helperPlistPath, key, value)
   }
 
-  execFileSync(
-    process.execPath,
-    [
-      path.join(repoRoot, 'config/scripts/build-speech-macos.mjs'),
-      '--single-arch',
-      '--output',
-      path.join(appPath, 'Contents/MacOS/orca-speech')
-    ],
-    { stdio: 'inherit' }
-  )
+  const speechHelperPath = path.join(appPath, 'Contents', 'MacOS', 'orca-speech')
+  try {
+    execFileSync(
+      process.execPath,
+      [speechBuildScript, '--single-arch', '--output', speechHelperPath],
+      { stdio: 'inherit' }
+    )
+  } catch (error) {
+    rmSync(speechHelperPath, { force: true })
+    console.warn(
+      `[orca-dev] speech helper build failed (macOS native voice unavailable): ${error?.message ?? error}`
+    )
+  }
 
   // Bundle notification helper with dev signing ID because macOS keys authorization by it; without swiftc use delivery-probe fallback.
   try {
