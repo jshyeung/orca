@@ -29,7 +29,7 @@ struct OrcaSpeech {
         guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale.current) else {
             fail("macOS Speech does not support the system language. Select another speech model.")
         }
-        let transcriber = SpeechTranscriber(locale: locale, preset: .offlineTranscription)
+        let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
         if CommandLine.arguments[1] == "--prepare" {
             if let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
                 try await installation.downloadAndInstall()
