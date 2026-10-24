@@ -5,6 +5,10 @@ launcher builds the host architecture and places it beside Electron; packaged
 builds ship it in `Contents/MacOS`. Xcode 26 or newer with the macOS 26 SDK is required.
 The app continues to support older macOS versions, but this engine is only offered
 on macOS 26 and newer. Hardware and locale support are checked by the helper.
+Hosts without the bundled helper do not offer this engine. Existing mobile clients
+cannot represent system-managed engines, so it is omitted from their model list;
+if desktop settings select it, mobile dictation asks the user to choose a supported
+model instead. Parakeet and OpenAI remain available to mobile clients.
 
 The helper recognizes a private temporary WAV through `SpeechAnalyzer` and
 `SpeechTranscriber`, using the system locale and the offline transcription preset.

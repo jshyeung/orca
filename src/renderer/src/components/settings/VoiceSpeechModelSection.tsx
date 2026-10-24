@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type {
   VoiceSettings,
@@ -42,6 +42,13 @@ export function VoiceSpeechModelSection({
 }: VoiceSpeechModelSectionProps): React.JSX.Element {
   const [pendingDeleteModelIds, setPendingDeleteModelIds] = useState<Set<string>>(() => new Set())
   const [preparingSystemModel, setPreparingSystemModel] = useState(false)
+  const selectionRequest = useRef(0)
+  useEffect(
+    () => () => {
+      selectionRequest.current += 1
+    },
+    [voiceSettings.sttModel, voiceSettings.enabled]
+  )
   const getModelState = (id: string): SpeechModelState | undefined =>
     modelStates.find((s) => s.id === id)
 
@@ -97,12 +104,17 @@ export function VoiceSpeechModelSection({
                 key={manifest.id}
                 disabled={isDownloading}
                 onSelect={(event) => {
+                  const request = ++selectionRequest.current
                   if (manifest.provider === 'macos-native') {
                     event.preventDefault()
                     setPreparingSystemModel(true)
                     void window.api.speech
                       .downloadModel(manifest.id)
-                      .then(() => onUpdateVoiceSettings({ sttModel: manifest.id }))
+                      .then(() => {
+                        if (selectionRequest.current === request) {
+                          onUpdateVoiceSettings({ sttModel: manifest.id })
+                        }
+                      })
                       .catch((error: unknown) =>
                         toast.error(describeSpeechModelDownloadError(error))
                       )

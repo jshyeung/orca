@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import os from 'node:os'
+import fs from 'node:fs'
 import { readFile, access } from 'node:fs/promises'
 import { runProcess } from '@orca/process-host'
 import { MacosSpeechSession, prepareMacosSpeech } from './macos-speech-session'
@@ -7,6 +8,7 @@ import { MacosSpeechSession, prepareMacosSpeech } from './macos-speech-session'
 vi.mock('@orca/process-host', () => ({ runProcess: vi.fn() }))
 beforeEach(() => {
   vi.spyOn(os, 'release').mockReturnValue('25.0.0')
+  vi.spyOn(fs, 'existsSync').mockReturnValue(true)
 })
 afterEach(() => {
   vi.restoreAllMocks()
@@ -38,6 +40,13 @@ describe('macOS speech session', () => {
       timedOut: false
     })
     await expect(prepareMacosSpeech()).resolves.toBeUndefined()
+  })
+
+  it('refuses a missing helper before recording or preparing language assets', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    vi.spyOn(fs, 'existsSync').mockReturnValue(false)
+    expect(() => new MacosSpeechSession()).toThrow('helper is unavailable')
+    await expect(prepareMacosSpeech()).rejects.toThrow('helper is unavailable')
   })
 
   it('accepts more than one minute of audio but bounds buffered recording to ten minutes', () => {

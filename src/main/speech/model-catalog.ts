@@ -1,9 +1,9 @@
 import type { SpeechModelManifest } from '../../shared/speech-types'
 import { getSpeechModelDownloadMetadata } from './model-download-catalog'
-import { isMacosTahoeOrNewer } from '../window/macos-tahoe-release'
+import { getMacosSpeechHelperPath } from './macos-speech-helper'
 
 export const SPEECH_MODEL_CATALOG: SpeechModelManifest[] = [
-  ...(process.platform === 'darwin' && isMacosTahoeOrNewer()
+  ...(getMacosSpeechHelperPath()
     ? [
         {
           id: 'macos-native',

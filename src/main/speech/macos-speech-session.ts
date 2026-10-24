@@ -5,6 +5,7 @@ import path from 'node:path'
 import { encodePcm16Wav } from './openai-transcription-client'
 import { resampleToRate } from './stt-audio-resample'
 import { isMacosTahoeOrNewer } from '../window/macos-tahoe-release'
+import { getMacosSpeechHelperPath } from './macos-speech-helper'
 
 let preparation: Promise<void> | undefined
 
@@ -21,8 +22,12 @@ async function runMacosSpeech(args: string[], timeoutMs: number): Promise<string
   if (process.platform !== 'darwin' || !isMacosTahoeOrNewer()) {
     throw new Error('macOS speech recognition is only available on macOS 26 or newer')
   }
+  const helper = getMacosSpeechHelperPath()
+  if (!helper) {
+    throw new Error('macOS Speech helper is unavailable on this host. Select another speech model.')
+  }
   const result = await runProcess({
-    program: path.join(path.dirname(process.execPath), 'orca-speech'),
+    program: helper,
     args,
     timeoutMs,
     maxOutputBytes: 1024 * 1024
@@ -40,6 +45,11 @@ export class MacosSpeechSession {
   constructor() {
     if (process.platform !== 'darwin' || !isMacosTahoeOrNewer()) {
       throw new Error('macOS speech recognition is only available on macOS 26 or newer')
+    }
+    if (!getMacosSpeechHelperPath()) {
+      throw new Error(
+        'macOS Speech helper is unavailable on this host. Select another speech model.'
+      )
     }
   }
 

@@ -1,5 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import os from 'node:os'
+import fs from 'node:fs'
+
+beforeEach(() => {
+  vi.spyOn(fs, 'existsSync').mockReturnValue(true)
+})
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -33,5 +38,13 @@ describe('macOS speech catalog visibility', () => {
     expect(model?.provider).toBe('macos-native')
     expect(model?.downloadFiles).toBeUndefined()
     expect(model && isLocalSpeechModel(model)).toBe(false)
+  })
+
+  it('omits the engine on a macOS 26 headless host without the bundled helper', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    vi.spyOn(os, 'release').mockReturnValue('25.0.0')
+    vi.spyOn(fs, 'existsSync').mockReturnValue(false)
+    const { getCatalogModel } = await import('./model-catalog')
+    expect(getCatalogModel('macos-native')).toBeUndefined()
   })
 })
