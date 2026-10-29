@@ -52,6 +52,7 @@ function fixture() {
     copyPrivateTree: (_source: string, destination: string) => copies.push(destination),
     restoreElectronFrameworkSymlinks() {},
     setPlistValue() {},
+    buildDevSwiftCliHelpers() {},
     pruneStaleDevBundles() {},
     getDevBundleProcessTable: () => [],
     isDevBundleInUse: () => inputs.inUse,
