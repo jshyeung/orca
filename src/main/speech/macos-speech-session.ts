@@ -18,7 +18,11 @@ export function prepareMacosSpeech(): Promise<void> {
   return preparation
 }
 
-async function runMacosSpeech(args: string[], timeoutMs: number): Promise<string> {
+async function runMacosSpeech(
+  args: string[],
+  timeoutMs: number,
+  signal?: AbortSignal
+): Promise<string> {
   if (process.platform !== 'darwin' || !isMacosTahoeOrNewer()) {
     throw new Error('macOS speech recognition is only available on macOS 26 or newer')
   }
@@ -30,6 +34,7 @@ async function runMacosSpeech(args: string[], timeoutMs: number): Promise<string
     program: helper,
     args,
     timeoutMs,
+    signal,
     maxOutputBytes: 1024 * 1024
   })
   if (result.code !== 0 || result.timedOut) {
@@ -41,6 +46,7 @@ async function runMacosSpeech(args: string[], timeoutMs: number): Promise<string
 export class MacosSpeechSession {
   private chunks: Float32Array[] = []
   private samples = 0
+  private readonly abortController = new AbortController()
 
   constructor() {
     if (process.platform !== 'darwin' || !isMacosTahoeOrNewer()) {
@@ -53,7 +59,16 @@ export class MacosSpeechSession {
     }
   }
 
+  cancel(): void {
+    this.chunks = []
+    this.samples = 0
+    this.abortController.abort()
+  }
+
   feedAudio(samples: Float32Array, sampleRate: number): void {
+    if (this.abortController.signal.aborted) {
+      return
+    }
     const normalized = resampleToRate(samples, sampleRate, 16000)
     this.samples += normalized.length
     if (this.samples > 16000 * 60 * 10) {
@@ -72,7 +87,11 @@ export class MacosSpeechSession {
     try {
       const audioPath = path.join(directory, 'dictation.wav')
       await writeFile(audioPath, encodePcm16Wav(chunks, 16000), { mode: 0o600 })
-      return await runMacosSpeech([audioPath], 55_000)
+      if (this.abortController.signal.aborted) {
+        return ''
+      }
+      const transcript = await runMacosSpeech([audioPath], 55_000, this.abortController.signal)
+      return this.abortController.signal.aborted ? '' : transcript
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

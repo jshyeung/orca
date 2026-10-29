@@ -86,4 +86,32 @@ describe('macOS speech session', () => {
     await expect(session.finish()).rejects.toThrow('Permission denied')
     await expect(access(file)).rejects.toThrow()
   })
+
+  it('discards buffered and subsequent audio when canceled', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    vi.mocked(runProcess).mockClear()
+    const session = new MacosSpeechSession()
+    session.feedAudio(new Float32Array(160), 16000)
+    session.cancel()
+    session.feedAudio(new Float32Array(160), 16000)
+    expect(await session.finish()).toBe('')
+    expect(runProcess).not.toHaveBeenCalled()
+  })
+
+  it('aborts recognition on discard, suppresses its result, and removes the WAV', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    const session = new MacosSpeechSession()
+    let file = ''
+    vi.mocked(runProcess).mockImplementation(async (spec) => {
+      file = String(spec.args?.[0])
+      await access(file)
+      expect(spec.signal?.aborted).toBe(false)
+      session.cancel()
+      expect(spec.signal?.aborted).toBe(true)
+      return { code: 0, signal: null, stdout: 'discarded text', stderr: '', timedOut: false }
+    })
+    session.feedAudio(new Float32Array(160), 16000)
+    expect(await session.finish()).toBe('')
+    await expect(access(file)).rejects.toThrow()
+  })
 })
