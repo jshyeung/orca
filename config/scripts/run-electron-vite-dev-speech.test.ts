@@ -5,6 +5,13 @@ import vm from 'node:vm'
 import { describe, expect, it } from 'vitest'
 
 const runner = readFileSync(new URL('./run-electron-vite-dev.mjs', import.meta.url), 'utf8')
+const speechHelperModule = readFileSync(
+  new URL('./dev-macos-speech-helper.mjs', import.meta.url),
+  'utf8'
+)
+const speechFactory = speechHelperModule
+  .slice(speechHelperModule.indexOf('export function'))
+  .replace('export function', 'function')
 const prepare = runner.slice(
   runner.indexOf('function prepareMacDevElectronApp()'),
   runner.indexOf('\nfunction isSymlink(')
@@ -80,7 +87,8 @@ function fixture() {
     copies,
     commands,
     env,
-    launch: () => vm.runInNewContext(`${prepare}\nprepareMacDevElectronApp()`, context)
+    launch: () =>
+      vm.runInNewContext(`${speechFactory}\n${prepare}\nprepareMacDevElectronApp()`, context)
   }
 }
 

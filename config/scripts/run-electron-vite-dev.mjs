@@ -42,6 +42,7 @@ import { withRolldownThreadLimit } from './rolldown-thread-limit.mjs'
 import { withDevRolldownRuntimeEnv } from './dev-rolldown-runtime-env.mjs'
 import { copyPrivateTree } from './space-sharing-copy.mjs'
 import { buildDevSwiftCliHelpers } from './swift-cli-helper-macos.mjs'
+import { createDevSpeechHelper } from './dev-macos-speech-helper.mjs'
 import {
   DEV_BUNDLE_ID,
   getDevBundlePlistPatches,
@@ -284,34 +285,10 @@ function prepareMacDevElectronApp() {
     )
   }
 
-  const speechHelperPath = path.join(appPath, 'Contents', 'MacOS', 'orca-speech')
-  function buildSpeechHelper() {
-    try {
-      const args = [speechBuildScript, '--single-arch', '--output', speechHelperPath]
-      execFileSync(process.execPath, args, { stdio: 'inherit' })
-      return true
-    } catch (error) {
-      rmSync(speechHelperPath, { force: true })
-      console.warn(
-        `[orca-dev] speech helper build failed (macOS native voice unavailable): ${error?.message ?? error}`
-      )
-      return false
-    }
-  }
+  const speechHelper = createDevSpeechHelper({ repoRoot, appPath, distDir, markerPath })
 
   if (copiedAppIsUsable()) {
-    if (!existsSync(speechHelperPath)) {
-      const processTable = getDevBundleProcessTable()
-      const canRetry = processTable !== null && !isDevBundleInUse(distDir, processTable)
-      if (canRetry && buildSpeechHelper()) {
-        try {
-          execFileSync('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', appPath])
-        } catch (error) {
-          rmSync(markerPath, { force: true })
-          console.warn(`[orca-dev] ad-hoc codesign failed: ${error?.message ?? error}`)
-        }
-      }
-    }
+    speechHelper.retryIfMissing()
     pruneStaleDevBundles(distDir)
     process.env.ELECTRON_EXEC_PATH = executablePath
     return
@@ -356,7 +333,7 @@ function prepareMacDevElectronApp() {
     setPlistValue(helperPlistPath, key, value)
   }
 
-  buildSpeechHelper()
+  speechHelper.build()
 
   // Bundle notification helper with dev signing ID because macOS keys authorization by it; without swiftc use delivery-probe fallback.
   try {
